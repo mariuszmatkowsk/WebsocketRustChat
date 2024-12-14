@@ -1,0 +1,2 @@
+# WebsocketRustChat
+Simple websocket chat.
