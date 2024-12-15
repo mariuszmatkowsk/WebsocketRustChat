@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use tokio::{io::AsyncReadExt, net::TcpStream};
 
 use crate::ws::http_request::HttpRequest;
 use crate::ws::http_request_parser::{HttpRequestParser, ParseResult};
+use crate::ws::http_header::HttpHeader;
 
 #[derive(Clone)]
 pub struct HttpSession {
@@ -17,11 +17,11 @@ impl Drop for HttpSession {
 }
 
 impl HttpSession {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new() -> Self {
+        Self {
             request: HttpRequest::default(),
             request_parser: HttpRequestParser::new(),
-        })
+        }
     }
 
     async fn do_response(&self) {
@@ -38,7 +38,7 @@ impl HttpSession {
 
         let remote_addr = format!("{}:{}", remote.ip().to_string(), remote.port());
 
-        println!("New http session for client: {}", remote_addr);
+        println!("New http connection: {}", remote_addr);
 
         let mut buffer = [0; 1024];
 
@@ -59,21 +59,39 @@ impl HttpSession {
                 break;
             }
 
-            let result = self
-                .request_parser
-                .parse(&mut self.request, buffer[..n].iter().cloned());
+            let input = String::from_utf8(buffer[..n].to_vec())
+                .map_err(|e| {
+                    eprintln!("Couldn't convert utf8 to valid char, error: {}", e);
+                })
+                .unwrap();
+
+            let result = self.request_parser.parse(&mut self.request, input.chars());
 
             match result {
                 ParseResult::Ok => {
+                    if is_websocket_request(&self.request.headers) {
+                        println!("websocket request to handle !!!!!!!!!!!!!!");
+                    } else {
+                        println!("normal http request to handle !!!!!!!!!");
+                    }
+                    println!("***********************************************");
+                    println!("{:?}", self.request);
+                    println!("***********************************************");
                     self.do_response().await;
                     break;
                 }
                 ParseResult::Indeterminate => continue,
                 ParseResult::Bad => {
-                    eprintln!();
+                    eprintln!("Could not parse request from client: {}", remote_addr);
                     return;
                 }
             }
         }
     }
+}
+
+fn is_websocket_request(headers: &Vec<HttpHeader>) -> bool {
+    return headers.iter().any(|header| {
+        header.name == "Upgrade" && header.value == "websocket"
+    });
 }

@@ -33,8 +33,8 @@ impl WsServer {
                 }
             };
             
-            let http_session = http_session::HttpSession::new();
             tokio::spawn(async move {
+                let mut http_session = http_session::HttpSession::new();
                 http_session.handle_socket(socket).await;
             });
         }

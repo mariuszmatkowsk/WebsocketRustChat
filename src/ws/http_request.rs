@@ -1,10 +1,13 @@
-#[derive(Clone)]
+use crate::ws::http_header::HttpHeader;
+
+#[derive(Clone, Debug)]
 pub struct HttpRequest {
-    method: String,
-    uri: String,
-    version_major: u8,
-    version_minor: u8,
-    body: String,
+    pub method: String,
+    pub uri: String,
+    pub headers: Vec<HttpHeader>,
+    pub version_major: u8,
+    pub version_minor: u8,
+    pub body: String,
 }
 
 impl HttpRequest {
@@ -12,6 +15,7 @@ impl HttpRequest {
         Self {
             method: String::new(),
             uri: String::new(),
+            headers: Vec::new(),
             version_major: 0,
             version_minor: 0,
             body: String::new(),
