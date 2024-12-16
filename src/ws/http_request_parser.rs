@@ -192,7 +192,7 @@ impl HttpRequestParser {
                     return ParseResult::Bad;
                 }
 
-                request.headers.push(HttpHeader::new());
+                request.headers.push(HttpHeader::default());
                 request.headers.last_mut().unwrap().name.push(c);
                 self.state = ParserState::HeaderName;
                 return ParseResult::Indeterminate;

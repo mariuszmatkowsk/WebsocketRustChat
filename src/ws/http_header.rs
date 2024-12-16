@@ -5,7 +5,11 @@ pub struct HttpHeader {
 }
 
 impl HttpHeader {
-    pub fn new() -> Self {
+    pub fn new(name: String, value: String) -> Self {
+        Self {name, value}
+    }
+
+    pub fn default() -> Self {
         Self {name: String::new(), value: String::new()}
     }
 }

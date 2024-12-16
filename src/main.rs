@@ -1,34 +1,54 @@
 mod ws;
 
+use std::fs::read;
+use ws::http_header::HttpHeader;
+use ws::http_request::HttpRequest;
+use ws::http_response::{HttpResponse, StatusType};
+use ws::http_router::HttpRouter;
+use ws::method::Method;
 use ws::ws_server::WsServer;
 
-// use tokio::net::{TcpListener, TcpStream};
-// use tokio_tungstenite::accept_async;
-// use tokio_tungstenite::tungstenite::protocol::Message;
-// use futures_util::{StreamExt, SinkExt};
+fn handle_index(_request: &HttpRequest, response: &mut HttpResponse) {
+    println!("handling index");
+    let index_content =
+        match read("/home/mariusz/code/rust/public_repos/WebsocketRustChat/index.html") {
+            Ok(content) => content,
+            Err(e) => {
+                eprintln!("Could not read content of index.html, error: {}", e);
+                response.status = StatusType::InternalServerError;
+                response.body =
+                    b"<html><head></head><body>Internal Server Error</body></html>".to_vec();
+                response.headers.push(HttpHeader::new(
+                    String::from("Content-Type"),
+                    String::from("text/html"),
+                ));
+                response.headers.push(HttpHeader::new(
+                    String::from("Content-Length"),
+                    response.body.len().to_string(),
+                ));
+                return;
+            }
+        };
 
-// async fn handle_connection(tcp_stream: TcpStream) {
-//     let remote = tcp_stream.peer_addr().map_err(|e| {
-//         eprintln!("Could not get remote address, error: {}", e);
-//     }).unwrap();
-//     println!("New connection {}:{}", remote.ip().to_string(), remote.port());
-//
-//     let ws_stream = accept_async(tcp_stream).await.map_err(|e| {
-//         eprintln!("Could not perform websocket connection, error: {}", e);
-//     }).unwrap();
-//
-//     let (mut write, mut read) = ws_stream.split();
-//
-//     while let Some(Ok(msg)) = read.next().await {
-//         if let Message::Text(text) = msg {
-//             write.send(Message::Text(format!("Echo: {}", text)))
-//                 .await
-//                 .expect("Failed to send message");
-//         }
-//     }
-// }
+    response.status = StatusType::Ok;
+    response.body = index_content;
+    response.headers.push(HttpHeader::new(
+        String::from("Content-Type"),
+        String::from("text/html"),
+    ));
+    response.headers.push(HttpHeader::new(
+        String::from("Content-Length"),
+        response.body.len().to_string(),
+    ));
+}
 
 #[tokio::main]
 async fn main() {
-    WsServer::new().start("localhost:6969").await;
+    let mut http_router = HttpRouter::new();
+
+    http_router
+        .add_route(Method::Get, String::from("/"), handle_index)
+        .add_route(Method::Get, String::from("/index.html"), handle_index);
+
+    WsServer::new(http_router).start("localhost:6969").await;
 }
