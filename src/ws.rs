@@ -7,6 +7,7 @@ pub mod http_header;
 pub mod file_storage;
 pub mod static_file_handler;
 pub mod handler;
+pub mod middleware;
 mod http_session;
 mod http_request_parser;
 mod ws_session;

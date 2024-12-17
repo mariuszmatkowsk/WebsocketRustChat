@@ -9,6 +9,7 @@ use ws::http_router::HttpRouter;
 use ws::method::Method;
 use ws::ws_server::WsServer;
 use ws::static_file_handler::StaticFileHandler;
+use ws::middleware::{Middleware, RequestLogger};
 
 #[tokio::main]
 async fn main() {
@@ -33,7 +34,9 @@ async fn main() {
         .add_route(
             Method::Get,
             String::from("/"),
-            StaticFileHandler::new(file_storage.clone(), String::from("index.html")),
+            Middleware::new(
+                RequestLogger::new(),
+                StaticFileHandler::new(file_storage.clone(), String::from("index.html"))),
         )
         .add_route(
             Method::Get,
