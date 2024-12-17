@@ -1,6 +1,6 @@
 use crate::ws::http_header::HttpHeader;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum StatusType {
     Ok = 200,
     // Created = 201,
@@ -13,8 +13,8 @@ pub enum StatusType {
     // BadRequest = 400,
     // Unauthorized = 401,
     // Forbidden = 403,
-    // NotFound = 404,
-    // MethodNotAllowed = 405,
+    NotFound = 404,
+    MethodNotAllowed = 405,
     InternalServerError = 500,
     // NotImplemented = 501,
     // BadGetway = 502,
@@ -25,7 +25,8 @@ impl StatusType {
     fn to_string(&self) -> String {
         match self {
             Self::Ok => String::from("Ok"),
-            // Self::NotFound => String::from("Not Found"),
+            Self::NotFound => String::from("Not Found"),
+            Self::MethodNotAllowed => String::from("Method Not Allowed"),
             Self::InternalServerError => String::from("Internal Server Errror"),
         }
     }
@@ -48,11 +49,11 @@ impl HttpResponse {
     }
 
     pub fn new(status: StatusType, mut headers: Vec<HttpHeader>, body: Vec<u8>) -> Self {
-        headers.push(HttpHeader::new(String::from("Content-Length"), body.len().to_string()));
+        headers.push(HttpHeader::new("Content-Length", &body.len().to_string()));
         Self {
             status,
             headers,
-            body
+            body,
         }
     }
 
@@ -62,16 +63,14 @@ impl HttpResponse {
         response.extend_from_slice(
             format!(
                 "HTTP/1.1 {} {}\r\n",
-                self.status as u8,
+                self.status as u16,
                 self.status.to_string()
             )
             .as_bytes(),
         );
 
         for header in &self.headers {
-            response
-                .extend_from_slice(format!("{}: {}\r\n", header.name, header.value)
-                .as_bytes());
+            response.extend_from_slice(format!("{}: {}\r\n", header.name, header.value).as_bytes());
         }
 
         response.extend_from_slice("\r\n".as_bytes());

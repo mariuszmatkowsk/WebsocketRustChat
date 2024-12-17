@@ -13,7 +13,10 @@ impl FileStorage {
         let entries = match read_dir(path) {
             Ok(entries) => entries,
             Err(err) => {
-                eprintln!("Culd not read provided dir path: {:?}, error: {}", path, err);
+                eprintln!(
+                    "Culd not read provided dir path: {:?}, error: {}",
+                    path, err
+                );
                 return None;
             }
         };
@@ -40,6 +43,10 @@ impl FileStorage {
             };
 
             files.insert(file_entry.file_name().into_string().unwrap(), file_content);
+            println!(
+                "Successfully loaded file: {}.",
+                file_entry.file_name().to_str().unwrap()
+            );
         }
 
         Some(Self { files })

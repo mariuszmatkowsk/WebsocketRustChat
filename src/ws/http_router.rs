@@ -1,6 +1,7 @@
 use crate::ws::file_storage::FileStorage;
+use crate::ws::http_header::HttpHeader;
 use crate::ws::http_request::HttpRequest;
-use crate::ws::http_response::HttpResponse;
+use crate::ws::http_response::{HttpResponse, StatusType};
 use crate::ws::method::Method;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -25,22 +26,39 @@ impl HttpRouter {
         let method = match Method::from_str(request.method.as_str()) {
             Ok(method) => method,
             Err(_) => {
-                eprintln!("Not supported method in http request");
-                todo!("Return method not supported");
+                self.handle_error(
+                    "405.html".to_string(),
+                    StatusType::MethodNotAllowed,
+                    &request,
+                    response,
+                );
+                return;
             }
         };
 
         let inner_map = match self.routes.get(&method) {
             Some(inner_map) => inner_map,
             None => {
-                todo!("Prepare response method not allowd");
+                self.handle_error(
+                    "405.html".to_string(),
+                    StatusType::MethodNotAllowed,
+                    &request,
+                    response,
+                );
+                return;
             }
         };
 
         let handler = match inner_map.get(&request.uri) {
             Some(handler) => handler,
             None => {
-                todo!("Resource not found");
+                self.handle_error(
+                    "404.html".to_string(),
+                    StatusType::NotFound,
+                    &request,
+                    response,
+                );
+                return;
             }
         };
 
@@ -56,5 +74,23 @@ impl HttpRouter {
             .or_insert_with(HashMap::new)
             .insert(uri, Box::new(handler));
         self
+    }
+
+    fn handle_error(
+        &self,
+        error_file: String,
+        status: StatusType,
+        _: &HttpRequest,
+        response: &mut HttpResponse,
+    ) {
+        let file_content = match self.file_storage.get(&error_file) {
+            Some(content) => content,
+            None => &b"".to_vec(),
+        };
+
+        let mut headers = Vec::new();
+        headers.push(HttpHeader::new("Content-Type", "text/html"));
+
+        *response = HttpResponse::new(status, headers, file_content.to_vec());
     }
 }

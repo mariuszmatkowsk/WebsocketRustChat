@@ -4,6 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: #444;
+        }
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const socket = new WebSocket("ws://localhost:6969");
@@ -38,8 +85,10 @@
     </script>
 </head>
 <body>
-    <h1>WebSocket Client</h1>
-    <input type="text" id="messageInput" placeholder="Type your message here">
-    <button id="sendMessage">Send Message</button>
+    <div class="container">
+        <h1>WebSocket Client</h1>
+        <input type="text" id="messageInput" placeholder="Type your message here">
+        <button id="sendMessage">Send Message</button>
+    </div>
 </body>
 </html>
