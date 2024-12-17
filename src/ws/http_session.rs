@@ -38,7 +38,7 @@ impl HttpSession {
             Ok(_) => (),
             Err(e) => {
                 eprintln!(
-                    "Respond was not send to client: {}:{}, error: {}",
+                    "Http respond can't be sent to client: {}:{}, error: {}",
                     remote.ip().to_string(),
                     remote.port(),
                     e
@@ -57,12 +57,8 @@ impl HttpSession {
 
         let remote_addr = format!("{}:{}", remote.ip().to_string(), remote.port());
 
-        println!("New http connection: {}", remote_addr);
-
         let mut buffer = [0; 1024];
-
         let mut total = 0;
-
         loop {
             let n = match socket.peek(&mut buffer).await {
                 Ok(n) => n,
@@ -86,11 +82,9 @@ impl HttpSession {
                 })
                 .unwrap();
 
-            let result = self.request_parser.parse(&mut self.request, input.chars());
-
             total += n;
 
-            match result {
+            match self.request_parser.parse(&mut self.request, input.chars()) {
                 ParseResult::Ok => {
                     break;
                 }
@@ -101,9 +95,7 @@ impl HttpSession {
                 }
             }
         }
-        println!("***********************************************");
-        println!("{:?}", self.request);
-        println!("***********************************************");
+
         if is_websocket_request(&self.request.headers) {
             tokio::spawn(async move {
                 let ws_session = WsSession::new(socket).await;
@@ -114,24 +106,18 @@ impl HttpSession {
                         return;
                     }
                 };
-                println!("Handle new websock connection");
                 ws_session.handle().await;
             });
             return;
-        } else {
-            // cleanup socket
-            let mut tmp_buff = vec![0; total];
-            match socket.read_exact(&mut tmp_buff).await {
-                Ok(_) => (),
-                Err(e) => {
-                    eprintln!("Could not remove data from socket, error: {}", e);
-                    return;
-                }
-            }
-            self.router.handle(&self.request, &mut self.response);
-
-            self.do_response(socket).await;
         }
+
+        if !cleanup_socket_data(&mut socket, total).await {
+            eprintln!("Culd not cleanup socket");
+            return;
+        }
+
+        self.router.handle(&self.request, &mut self.response);
+        self.do_response(socket).await;
     }
 }
 
@@ -139,4 +125,9 @@ fn is_websocket_request(headers: &Vec<HttpHeader>) -> bool {
     return headers
         .iter()
         .any(|header| header.name == "Upgrade" && header.value == "websocket");
+}
+
+async fn cleanup_socket_data(socket: &mut TcpStream, n: usize) -> bool {
+    let mut discard_buff = vec![0; n];
+    socket.read(&mut discard_buff).await.is_ok()
 }
