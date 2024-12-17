@@ -16,12 +16,6 @@ pub struct HttpSession {
     router: Arc<HttpRouter>,
 }
 
-impl Drop for HttpSession {
-    fn drop(&mut self) {
-        println!("Http session closed.");
-    }
-}
-
 impl HttpSession {
     pub fn new(router: Arc<HttpRouter>) -> Self {
         Self {
@@ -51,7 +45,7 @@ impl HttpSession {
         let remote = socket
             .peer_addr()
             .map_err(|e| {
-                eprintln!("Could not get remote address, error: {}", e);
+                eprintln!("Can't get remote address, error: {}", e);
             })
             .unwrap();
 
@@ -78,7 +72,7 @@ impl HttpSession {
 
             let input = String::from_utf8(buffer[..n].to_vec())
                 .map_err(|e| {
-                    eprintln!("Couldn't convert utf8 to valid char, error: {}", e);
+                    eprintln!("Can't convert utf8 to valid char, error: {}", e);
                 })
                 .unwrap();
 
@@ -90,7 +84,7 @@ impl HttpSession {
                 }
                 ParseResult::Indeterminate => continue,
                 ParseResult::Bad => {
-                    eprintln!("Could not parse request from client: {}", remote_addr);
+                    eprintln!("Can't parse request from client: {}", remote_addr);
                     return;
                 }
             }
@@ -102,7 +96,7 @@ impl HttpSession {
                 let mut ws_session = match ws_session {
                     Some(ws_session) => ws_session,
                     None => {
-                        eprintln!("Could not accept websockt connection");
+                        eprintln!("Can't accept websockt connection");
                         return;
                     }
                 };
@@ -112,7 +106,7 @@ impl HttpSession {
         }
 
         if !cleanup_socket_data(&mut socket, total).await {
-            eprintln!("Culd not cleanup socket");
+            eprintln!("Can't cleanup socket");
             return;
         }
 

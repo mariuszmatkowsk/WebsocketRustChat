@@ -7,7 +7,7 @@ pub struct HttpRequest {
     pub headers: Vec<HttpHeader>,
     pub version_major: u8,
     pub version_minor: u8,
-    pub body: String,
+    pub _body: String,
 }
 
 impl HttpRequest {
@@ -18,7 +18,7 @@ impl HttpRequest {
             headers: Vec::new(),
             version_major: 0,
             version_minor: 0,
-            body: String::new(),
+            _body: String::new(),
         }
     }
 }

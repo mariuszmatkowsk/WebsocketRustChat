@@ -1,7 +1,8 @@
-use crate::ws::http_router::HttpRouter;
-use crate::ws::http_session;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+
+use crate::ws::http_router::HttpRouter;
+use crate::ws::http_session;
 
 pub struct WsServer {
     router: Arc<HttpRouter>,
@@ -18,7 +19,7 @@ impl WsServer {
         let tcp_listener = TcpListener::bind(add)
             .await
             .map_err(|e| {
-                eprintln!("Culd not bind to address: {}, err: {}", add, e);
+                eprintln!("Could not bind to address: {}, err: {}", add, e);
             })
             .unwrap();
 
@@ -33,7 +34,7 @@ impl WsServer {
                     socket
                 }
                 Err(e) => {
-                    eprintln!("Could not accept new connection, error: {}", e);
+                    eprintln!("Could not accept new Tcp connection, error: {}", e);
                     continue;
                 }
             };

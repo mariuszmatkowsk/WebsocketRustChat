@@ -14,7 +14,7 @@ impl FileStorage {
             Ok(entries) => entries,
             Err(err) => {
                 eprintln!(
-                    "Culd not read provided dir path: {:?}, error: {}",
+                    "Can't read provided dir path: {:?}, error: {}",
                     path, err
                 );
                 return None;
@@ -34,7 +34,7 @@ impl FileStorage {
                 Ok(content) => content,
                 Err(err) => {
                     eprintln!(
-                        "Could not read content file: {:?}, error: {}",
+                        "Can't read content of file: {:?}, error: {}",
                         file_entry.path(),
                         err
                     );

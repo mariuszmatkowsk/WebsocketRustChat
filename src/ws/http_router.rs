@@ -1,13 +1,18 @@
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use crate::ws::file_storage::FileStorage;
 use crate::ws::http_header::HttpHeader;
 use crate::ws::http_request::HttpRequest;
 use crate::ws::http_response::{HttpResponse, StatusType};
 use crate::ws::method::Method;
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
 
 type Handler = Box<dyn Fn(&HttpRequest, &mut HttpResponse) + Send + Sync>;
+
+// pub trait Handler {
+//     pub fn handle(&HttpRequest, &mut HttpResponse);
+// }
 
 pub struct HttpRouter {
     routes: HashMap<Method, HashMap<String, Handler>>,
@@ -85,7 +90,7 @@ impl HttpRouter {
     ) {
         let file_content = match self.file_storage.get(&error_file) {
             Some(content) => content,
-            None => &b"".to_vec(),
+            None => unreachable!("404.html and 405.html should be already verified and cached."),
         };
 
         let mut headers = Vec::new();

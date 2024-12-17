@@ -8,17 +8,6 @@ pub enum Method {
     Delete,
 }
 
-impl Method {
-    fn as_str(&self) -> &str {
-        match self {
-            Method::Get => "GET",
-            Method::Post => "POST",
-            Method::Update => "UPDATE",
-            Method::Delete => "DELETE",
-        }
-    }
-}
-
 impl FromStr for Method {
     type Err = ();
 

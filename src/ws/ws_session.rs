@@ -13,10 +13,9 @@ where
 {
     pub async fn new(socket: S) -> Option<Self> {
         let ws_socket = accept_async(socket).await.map_err(|e| {
-            eprintln!("Could not accept websocket, error {}", e);
+            eprintln!("Could not accept websocket connection, error {}", e);
             return ()
         }).unwrap();
-        println!("New websocket connection established.");
         Some(Self {ws_socket})
     }
 
