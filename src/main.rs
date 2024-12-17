@@ -1,54 +1,54 @@
 mod ws;
 
 use std::env;
-use std::fs::read;
 use std::path::Path;
+use std::sync::Arc;
 
+use ws::file_storage::FileStorage;
 use ws::http_header::HttpHeader;
 use ws::http_request::HttpRequest;
 use ws::http_response::{HttpResponse, StatusType};
 use ws::http_router::HttpRouter;
 use ws::method::Method;
 use ws::ws_server::WsServer;
-use ws::file_storage::FileStorage;
 
-fn handle_index(_request: &HttpRequest, response: &mut HttpResponse) {
-    println!("handling index");
-    let index_content =
-        match read("/home/mariusz/code/rust/public_repos/WebsocketRustChat/index.html") {
-            Ok(content) => content,
-            Err(e) => {
-                eprintln!("Could not read content of index.html, error: {}", e);
-                response.status = StatusType::InternalServerError;
-                response.body =
-                    b"<html><head></head><body>Internal Server Error</body></html>".to_vec();
-                response.headers.push(HttpHeader::new(
-                    String::from("Content-Type"),
-                    String::from("text/html"),
-                ));
-                response.headers.push(HttpHeader::new(
-                    String::from("Content-Length"),
-                    response.body.len().to_string(),
-                ));
-                return;
+fn extension_to_mimo_type(extension: &str) -> String {
+    match extension {
+        ".html" => String::from("text/html"),
+        ".png" => String::from("image/png"),
+        _ => {
+            todo!()
+        }
+    }
+}
+
+pub struct StaticFileHandler {
+    file_storage: Arc<FileStorage>,
+    file_name: String,
+}
+
+impl StaticFileHandler {
+    pub fn handle(&self, _request: &HttpRequest, response: &mut HttpResponse) {
+        let file_content = match self.file_storage.get(&self.file_name) {
+            Some(file_content) => file_content,
+            None => {
+                todo!("Response Not found");
             }
         };
 
-    response.status = StatusType::Ok;
-    response.body = index_content;
-    response.headers.push(HttpHeader::new(
-        String::from("Content-Type"),
-        String::from("text/html"),
-    ));
-    response.headers.push(HttpHeader::new(
-        String::from("Content-Length"),
-        response.body.len().to_string(),
-    ));
+        let mut headers = Vec::new();
+        headers.push(HttpHeader::new(
+            String::from("Content-Type"),
+            extension_to_mimo_type(&self.file_name[self.file_name.find('.').unwrap()..]),
+        ));
+
+        *response = HttpResponse::new(StatusType::Ok, headers, file_content.to_vec());
+    }
 }
 
 #[tokio::main]
 async fn main() {
-    let args : Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         eprintln!("Usage: WebsocketRustChat <doc_root>");
         std::process::exit(1);
@@ -62,10 +62,40 @@ async fn main() {
         }
     };
 
-    let mut http_router = HttpRouter::new(&file_storage);
+    let file_storage = Arc::new(file_storage);
+
+    let mut http_router = HttpRouter::new(file_storage.clone());
     http_router
-        .add_route(Method::Get, String::from("/"), handle_index)
-        .add_route(Method::Get, String::from("/index.html"), handle_index);
+        .add_route(Method::Get, String::from("/"), {
+            let file_storage = file_storage.clone();
+            move |req, resp| {
+                StaticFileHandler {
+                    file_storage: file_storage.clone(),
+                    file_name: String::from("index.html"),
+                }
+                .handle(req, resp);
+            }
+        })
+        .add_route(Method::Get, String::from("/index.html"), {
+            let file_storage = file_storage.clone();
+            move |req, resp| {
+                StaticFileHandler {
+                    file_storage: file_storage.clone(),
+                    file_name: String::from("index.html"),
+                }
+                .handle(req, resp);
+            }
+        })
+        .add_route(Method::Get, String::from("/favicon.ico"), {
+            let file_storage = file_storage.clone();
+            move |req, resp| {
+                StaticFileHandler {
+                    file_storage: file_storage.clone(),
+                    file_name: String::from("favicon.png"),
+                }
+                .handle(req, resp);
+            }
+        });
 
     WsServer::new(http_router).start("localhost:6969").await;
 }

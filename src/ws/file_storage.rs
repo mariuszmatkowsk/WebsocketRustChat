@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::{read, read_dir};
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct FileStorage {
     files: HashMap<String, Vec<u8>>,
 }
@@ -42,5 +43,9 @@ impl FileStorage {
         }
 
         Some(Self { files })
+    }
+
+    pub fn get(&self, file: &str) -> Option<&Vec<u8>> {
+        self.files.get(file)
     }
 }

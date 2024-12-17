@@ -1,19 +1,20 @@
+use crate::ws::file_storage::FileStorage;
 use crate::ws::http_request::HttpRequest;
 use crate::ws::http_response::HttpResponse;
-use crate::ws::file_storage::FileStorage;
 use crate::ws::method::Method;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 
-type Handler = fn(&HttpRequest, &mut HttpResponse);
+type Handler = Box<dyn Fn(&HttpRequest, &mut HttpResponse) + Send + Sync>;
 
-pub struct HttpRouter<'a> {
+pub struct HttpRouter {
     routes: HashMap<Method, HashMap<String, Handler>>,
-    file_storage: &'a FileStorage,
+    file_storage: Arc<FileStorage>,
 }
 
-impl<'a> HttpRouter<'a> {
-    pub fn new(file_storage: &'a FileStorage) -> Self {
+impl HttpRouter {
+    pub fn new(file_storage: Arc<FileStorage>) -> Self {
         Self {
             routes: HashMap::new(),
             file_storage,
@@ -46,11 +47,14 @@ impl<'a> HttpRouter<'a> {
         handler(request, response);
     }
 
-    pub fn add_route(&mut self, method: Method, uri: String, handler: Handler) -> &mut Self  {
+    pub fn add_route<H>(&mut self, method: Method, uri: String, handler: H) -> &mut Self
+    where
+        H: Fn(&HttpRequest, &mut HttpResponse) + Send + Sync + 'static,
+    {
         self.routes
             .entry(method)
             .or_insert_with(HashMap::new)
-            .insert(uri, handler);
+            .insert(uri, Box::new(handler));
         self
     }
 }

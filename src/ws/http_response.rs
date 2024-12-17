@@ -47,6 +47,15 @@ impl HttpResponse {
         }
     }
 
+    pub fn new(status: StatusType, mut headers: Vec<HttpHeader>, body: Vec<u8>) -> Self {
+        headers.push(HttpHeader::new(String::from("Content-Length"), body.len().to_string()));
+        Self {
+            status,
+            headers,
+            body
+        }
+    }
+
     pub fn bytes(&self) -> Vec<u8> {
         let mut response = Vec::new();
 
