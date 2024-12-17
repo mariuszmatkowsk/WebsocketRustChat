@@ -7,8 +7,8 @@ use std::sync::Arc;
 use ws::file_storage::FileStorage;
 use ws::http_router::HttpRouter;
 use ws::method::Method;
+use ws::static_file_handler::StaticFileHandler;
 use ws::ws_server::WsServer;
-use ws::static_file_handler::static_file_handler;
 
 #[tokio::main]
 async fn main() {
@@ -33,17 +33,26 @@ async fn main() {
         .add_route(
             Method::Get,
             String::from("/"),
-            static_file_handler(file_storage.clone(), String::from("index.html")),
+            Box::new(StaticFileHandler::new(
+                file_storage.clone(),
+                String::from("index.html"),
+            )),
         )
         .add_route(
             Method::Get,
             String::from("/index.html"),
-            static_file_handler(file_storage.clone(), String::from("index.html")),
+            Box::new(StaticFileHandler::new(
+                file_storage.clone(),
+                String::from("index.html"),
+            )),
         )
         .add_route(
             Method::Get,
             String::from("/favicon.ico"),
-            static_file_handler(file_storage.clone(), String::from("favicon.png"))
+            Box::new(StaticFileHandler::new(
+                file_storage.clone(),
+                String::from("favicon.png"),
+            )),
         );
 
     WsServer::new(http_router).start("localhost:6969").await;

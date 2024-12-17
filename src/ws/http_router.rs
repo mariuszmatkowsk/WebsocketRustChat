@@ -7,15 +7,10 @@ use crate::ws::http_header::HttpHeader;
 use crate::ws::http_request::HttpRequest;
 use crate::ws::http_response::{HttpResponse, StatusType};
 use crate::ws::method::Method;
-
-type Handler = Box<dyn Fn(&HttpRequest, &mut HttpResponse) + Send + Sync>;
-
-// pub trait Handler {
-//     pub fn handle(&HttpRequest, &mut HttpResponse);
-// }
+use crate::ws::handler::Handler;
 
 pub struct HttpRouter {
-    routes: HashMap<Method, HashMap<String, Handler>>,
+    routes: HashMap<Method, HashMap<String, Box<dyn Handler + Sync + Send>>>,
     file_storage: Arc<FileStorage>,
 }
 
@@ -67,17 +62,15 @@ impl HttpRouter {
             }
         };
 
-        handler(request, response);
+        handler.handle(request, response);
     }
 
-    pub fn add_route<H>(&mut self, method: Method, uri: String, handler: H) -> &mut Self
-    where
-        H: Fn(&HttpRequest, &mut HttpResponse) + Send + Sync + 'static,
+    pub fn add_route(&mut self, method: Method, uri: String, handler: Box<dyn Handler + Sync + Send>) -> &mut Self
     {
         self.routes
             .entry(method)
             .or_insert_with(HashMap::new)
-            .insert(uri, Box::new(handler));
+            .insert(uri, handler);
         self
     }
 
