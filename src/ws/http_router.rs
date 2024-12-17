@@ -1,19 +1,22 @@
 use crate::ws::http_request::HttpRequest;
 use crate::ws::http_response::HttpResponse;
+use crate::ws::file_storage::FileStorage;
 use crate::ws::method::Method;
 use std::collections::HashMap;
 use std::str::FromStr;
 
 type Handler = fn(&HttpRequest, &mut HttpResponse);
 
-pub struct HttpRouter {
+pub struct HttpRouter<'a> {
     routes: HashMap<Method, HashMap<String, Handler>>,
+    file_storage: &'a FileStorage,
 }
 
-impl HttpRouter {
-    pub fn new() -> Self {
+impl<'a> HttpRouter<'a> {
+    pub fn new(file_storage: &'a FileStorage) -> Self {
         Self {
             routes: HashMap::new(),
+            file_storage,
         }
     }
 

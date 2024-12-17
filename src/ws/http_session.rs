@@ -1,12 +1,12 @@
-use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
 use std::sync::Arc;
+use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
 
 use crate::ws::http_header::HttpHeader;
 use crate::ws::http_request::HttpRequest;
-use crate::ws::http_response::HttpResponse;
 use crate::ws::http_request_parser::{HttpRequestParser, ParseResult};
-use crate::ws::ws_session::WsSession;
+use crate::ws::http_response::HttpResponse;
 use crate::ws::http_router::HttpRouter;
+use crate::ws::ws_session::WsSession;
 
 #[derive(Clone)]
 pub struct HttpSession {
@@ -28,7 +28,7 @@ impl HttpSession {
             request: HttpRequest::default(),
             response: HttpResponse::default(),
             request_parser: HttpRequestParser::new(),
-            router
+            router,
         }
     }
 
@@ -37,7 +37,12 @@ impl HttpSession {
         match socket.write_all(&self.response.bytes()[..]).await {
             Ok(_) => (),
             Err(e) => {
-                eprintln!("Respond was not send to client: {}:{}, error: {}", remote.ip().to_string(), remote.port(), e);
+                eprintln!(
+                    "Respond was not send to client: {}:{}, error: {}",
+                    remote.ip().to_string(),
+                    remote.port(),
+                    e
+                );
             }
         }
     }

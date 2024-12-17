@@ -1,12 +1,16 @@
 mod ws;
 
+use std::env;
 use std::fs::read;
+use std::path::Path;
+
 use ws::http_header::HttpHeader;
 use ws::http_request::HttpRequest;
 use ws::http_response::{HttpResponse, StatusType};
 use ws::http_router::HttpRouter;
 use ws::method::Method;
 use ws::ws_server::WsServer;
+use ws::file_storage::FileStorage;
 
 fn handle_index(_request: &HttpRequest, response: &mut HttpResponse) {
     println!("handling index");
@@ -44,8 +48,21 @@ fn handle_index(_request: &HttpRequest, response: &mut HttpResponse) {
 
 #[tokio::main]
 async fn main() {
-    let mut http_router = HttpRouter::new();
+    let args : Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        eprintln!("Usage: WebsocketRustChat <doc_root>");
+        std::process::exit(1);
+    }
+    let doc_root_path = Path::new(&args[1]);
+    let file_storage = match FileStorage::new(doc_root_path) {
+        Some(file_storage) => file_storage,
+        None => {
+            eprintln!("Could not load files from provided directory");
+            std::process::exit(1);
+        }
+    };
 
+    let mut http_router = HttpRouter::new(&file_storage);
     http_router
         .add_route(Method::Get, String::from("/"), handle_index)
         .add_route(Method::Get, String::from("/index.html"), handle_index);
