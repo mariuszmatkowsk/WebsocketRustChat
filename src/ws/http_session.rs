@@ -6,7 +6,7 @@ use crate::ws::http_request::HttpRequest;
 use crate::ws::http_request_parser::{HttpRequestParser, ParseResult};
 use crate::ws::http_response::HttpResponse;
 use crate::ws::http_router::HttpRouter;
-use crate::ws::ws_session::WsSession;
+use crate::ws::ws_session::{WsSession, Clients};
 
 #[derive(Clone)]
 pub struct HttpSession {
@@ -41,7 +41,11 @@ impl HttpSession {
         }
     }
 
-    pub async fn handle_socket(&mut self, mut socket: TcpStream) {
+    pub async fn handle_socket(
+        &mut self,
+        mut socket: TcpStream,
+        clients: Clients<TcpStream>,
+    ) {
         let remote = socket
             .peer_addr()
             .map_err(|e| {
@@ -91,8 +95,9 @@ impl HttpSession {
         }
 
         if is_websocket_request(&self.request.headers) {
+            let clients_copy = clients.clone();
             tokio::spawn(async move {
-                let ws_session = WsSession::new(socket).await;
+                let ws_session = WsSession::new(socket, clients_copy).await;
                 let mut ws_session = match ws_session {
                     Some(ws_session) => ws_session,
                     None => {
@@ -123,5 +128,5 @@ fn is_websocket_request(headers: &Vec<HttpHeader>) -> bool {
 
 async fn cleanup_socket_data(socket: &mut TcpStream, n: usize) -> bool {
     let mut discard_buff = vec![0; n];
-    socket.read(&mut discard_buff).await.is_ok()
+    socket.read_exact(&mut discard_buff).await.is_ok()
 }

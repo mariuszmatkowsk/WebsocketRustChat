@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 
 use crate::ws::http_router::HttpRouter;
 use crate::ws::http_session;
@@ -23,6 +24,8 @@ impl WsServer {
             })
             .unwrap();
 
+        let clients = Arc::new(Mutex::new(Vec::new()));
+
         loop {
             let socket = match tcp_listener.accept().await {
                 Ok((socket, remote_add)) => {
@@ -40,9 +43,10 @@ impl WsServer {
             };
 
             let router_copy = self.router.clone();
+            let clients_copy = clients.clone();
             tokio::spawn(async move {
                 let mut http_session = http_session::HttpSession::new(router_copy);
-                http_session.handle_socket(socket).await;
+                http_session.handle_socket(socket, clients_copy).await;
             });
         }
     }

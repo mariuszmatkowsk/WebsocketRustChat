@@ -41,12 +41,16 @@ async fn main() {
         .add_route(
             Method::Get,
             String::from("/index.html"),
-            StaticFileHandler::new(file_storage.clone(), String::from("index.html")),
+            Middleware::new(
+                RequestLogger::new(),
+                StaticFileHandler::new(file_storage.clone(), String::from("index.html"))),
         )
         .add_route(
             Method::Get,
             String::from("/favicon.ico"),
-            StaticFileHandler::new(file_storage.clone(), String::from("favicon.png"))
+            Middleware::new(
+                RequestLogger::new(),
+                StaticFileHandler::new(file_storage.clone(), String::from("favicon.png")))
         );
 
     WsServer::new(http_router).start("localhost:6969").await;
