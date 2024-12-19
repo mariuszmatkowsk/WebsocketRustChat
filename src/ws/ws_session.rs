@@ -2,7 +2,7 @@ use futures::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc::channel, Mutex};
 use tokio_tungstenite::tungstenite::protocol::Message;
 use tokio_tungstenite::{accept_async, WebSocketStream};
 
@@ -18,7 +18,7 @@ pub struct WsSession<S> {
 
 impl<S> WsSession<S>
 where
-    S: AsyncRead + AsyncWrite + Unpin,
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
     pub async fn new(socket: S, clients: Clients<S>) -> Option<Self> {
         let ws_socket = accept_async(socket)
@@ -39,36 +39,71 @@ where
     }
 
     pub async fn handle(&mut self) {
+        let (tx, mut rx) = channel::<String>(5);
+
+        let clients_clone = self.clients.clone();
+        let socket_write_half = self.socket_write_half.clone();
+        tokio::spawn(async move {
+            loop {
+                match rx.recv().await {
+                    None => (),
+                    Some(message) => {
+                        Self::brodcast_message(
+                            socket_write_half.clone(),
+                            message.clone(),
+                            clients_clone.clone(),
+                        )
+                        .await;
+                    }
+                }
+            }
+        });
+
         loop {
             let msg = match self.socket_read_half.next().await {
                 Some(Ok(Message::Text(msg))) => msg,
                 Some(Ok(Message::Binary(data))) => String::from_utf8(data).unwrap(),
                 Some(Ok(Message::Close(_))) => {
-                    todo!("Close message received");
+                    let mut clients = self.clients.lock().await;
+                    if let Some(pos) = clients
+                        .iter()
+                        .position(|c| Arc::ptr_eq(c, &self.socket_write_half))
+                    {
+                        clients.remove(pos);
+                        eprintln!("Client disconnected");
+                    }
+                    return;
                 }
                 _ => {
                     todo!("Not handled case");
                 }
             };
-            self.brodcast_message(msg).await;
+
+            match tx.send(msg).await {
+                Ok(()) => (),
+                Err(e) => {
+                    eprintln!("Could not send message to brodkcast task, error: {}", e);
+                }
+            }
         }
     }
 
-    async fn brodcast_message(&self, message: String) {
-        let clients = {
-            let clients_lock = self.clients.lock().await;
-            clients_lock.clone()
-        };
-
-        for write_client in clients.iter() {
-            if Arc::ptr_eq(write_client, &self.socket_write_half) {
+    async fn brodcast_message(sender: SocketWriteHalf<S>, message: String, clients: Clients<S>) {
+        for client in clients.lock().await.iter() {
+            if Arc::ptr_eq(client, &sender) {
                 continue;
             }
-            let mut write_client = write_client.lock().await;
-            write_client
-                .send(Message::text(format!("{}", message)))
-                .await
-                .expect("Message was sent");
+
+            let message_clone = message.clone();
+            let client_clone = client.clone();
+            tokio::spawn(async move {
+                client_clone
+                    .lock()
+                    .await
+                    .send(Message::text(format!("{}", message_clone)))
+                    .await
+                    .expect("Message should be sent");
+            });
         }
     }
 }
