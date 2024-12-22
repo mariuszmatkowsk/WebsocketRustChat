@@ -6,7 +6,15 @@ use crate::ws::http_request::HttpRequest;
 use crate::ws::http_request_parser::{HttpRequestParser, ParseResult};
 use crate::ws::http_response::HttpResponse;
 use crate::ws::http_router::HttpRouter;
-use crate::ws::ws_session::{WsSession, Clients};
+
+#[derive(PartialEq, Eq)]
+pub enum HttpHandleError {
+    WebsocketProtocol,
+    ParseRequestError,
+    SocketConnectionError,
+}
+
+pub type HandleResult = std::result::Result<(), HttpHandleError>;
 
 #[derive(Clone)]
 pub struct HttpSession {
@@ -26,7 +34,7 @@ impl HttpSession {
         }
     }
 
-    async fn do_response(&self, mut socket: TcpStream) {
+    async fn do_response(&self, socket: &mut TcpStream) {
         let remote = socket.peer_addr().unwrap();
         match socket.write_all(&self.response.bytes()[..]).await {
             Ok(_) => (),
@@ -41,38 +49,34 @@ impl HttpSession {
         }
     }
 
-    pub async fn handle_socket(
-        &mut self,
-        mut socket: TcpStream,
-        clients: Clients<TcpStream>,
-    ) {
-        let remote = socket
-            .peer_addr()
-            .map_err(|e| {
+    pub async fn handle_socket(&mut self, socket: &mut TcpStream) -> HandleResult {
+        let remote_addr = match socket.peer_addr() {
+            Ok(remote) => format!("{}:{}", remote.ip().to_string(), remote.port()),
+            Err(e) => {
                 eprintln!("Can't get remote address, error: {}", e);
-            })
-            .unwrap();
-
-        let remote_addr = format!("{}:{}", remote.ip().to_string(), remote.port());
+                return Err(HttpHandleError::SocketConnectionError);
+            }
+        };
 
         let mut buffer = [0; 1024];
         let mut total = 0;
         loop {
             let n = match socket.peek(&mut buffer).await {
-                Ok(n) => n,
+                Ok(n) => {
+                    if n == 0 {
+                        eprintln!("Can't read any data from client: {}", remote_addr);
+                        return Err(HttpHandleError::SocketConnectionError);
+                    }
+                    n
+                }
                 Err(e) => {
                     eprintln!(
                         "Error during read from client: {}, error: {}",
                         remote_addr, e
                     );
-                    return;
+                    return Err(HttpHandleError::SocketConnectionError);
                 }
             };
-
-            if n == 0 {
-                eprintln!("Can't read andy data from client: {}", remote_addr);
-                break;
-            }
 
             let input = String::from_utf8(buffer[..n].to_vec())
                 .map_err(|e| {
@@ -89,34 +93,23 @@ impl HttpSession {
                 ParseResult::Indeterminate => continue,
                 ParseResult::Bad => {
                     eprintln!("Can't parse request from client: {}", remote_addr);
-                    return;
+                    return Err(HttpHandleError::ParseRequestError);
                 }
             }
         }
 
         if is_websocket_request(&self.request.headers) {
-            let clients_copy = clients.clone();
-            tokio::spawn(async move {
-                let ws_session = WsSession::new(socket, clients_copy).await;
-                let mut ws_session = match ws_session {
-                    Some(ws_session) => ws_session,
-                    None => {
-                        eprintln!("Can't accept websockt connection");
-                        return;
-                    }
-                };
-                ws_session.handle().await;
-            });
-            return;
+            return Err(HttpHandleError::WebsocketProtocol);
         }
 
-        if !cleanup_socket_data(&mut socket, total).await {
+        if !cleanup_socket_data(socket, total).await {
             eprintln!("Can't cleanup socket");
-            return;
+            return Err(HttpHandleError::SocketConnectionError);
         }
 
         self.router.handle(&self.request, &mut self.response);
         self.do_response(socket).await;
+        Ok(())
     }
 }
 

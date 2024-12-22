@@ -1,10 +1,11 @@
 use futures::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::{mpsc::channel, Mutex};
-use tokio_tungstenite::tungstenite::protocol::Message;
-use tokio_tungstenite::{accept_async, WebSocketStream};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::{mpsc::channel, Mutex},
+};
+use tokio_tungstenite::{accept_async, tungstenite::protocol::Message, WebSocketStream};
 
 type SocketReadHalf<S> = SplitStream<WebSocketStream<S>>;
 type SocketWriteHalf<S> = Arc<Mutex<SplitSink<WebSocketStream<S>, Message>>>;
