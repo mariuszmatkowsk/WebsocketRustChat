@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
@@ -25,7 +26,7 @@ impl WsServer {
             })
             .unwrap();
 
-        let clients = Arc::new(Mutex::new(Vec::new()));
+        let clients = Arc::new(Mutex::new(HashMap::new()));
 
         loop {
             let mut socket = match tcp_listener.accept().await {
@@ -57,7 +58,7 @@ impl WsServer {
                                 return;
                             }
                         };
-                        ws_session.handle().await;
+                        ws_session.handle_ws_connection().await;
                     }
                 }
             });

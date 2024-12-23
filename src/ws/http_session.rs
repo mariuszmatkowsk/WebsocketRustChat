@@ -34,16 +34,13 @@ impl HttpSession {
         }
     }
 
-    async fn do_response(&self, socket: &mut TcpStream) {
-        let remote = socket.peer_addr().unwrap();
+    async fn do_response(&self, socket: &mut TcpStream, remote_addr: &str) {
         match socket.write_all(&self.response.bytes()[..]).await {
             Ok(_) => (),
             Err(e) => {
                 eprintln!(
-                    "Http respond can't be sent to client: {}:{}, error: {}",
-                    remote.ip().to_string(),
-                    remote.port(),
-                    e
+                    "Http respond can't be sent to client: {}, error: {}",
+                    remote_addr, e
                 );
             }
         }
@@ -108,7 +105,7 @@ impl HttpSession {
         }
 
         self.router.handle(&self.request, &mut self.response);
-        self.do_response(socket).await;
+        self.do_response(socket, &remote_addr).await;
         Ok(())
     }
 }
