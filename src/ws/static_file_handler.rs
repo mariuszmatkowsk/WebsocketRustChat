@@ -59,6 +59,7 @@ fn extension_to_http_mimo_type(extension: &str) -> &str {
         ".html" => "text/html",
         ".css" => "text/css",
         ".png" => "image/png",
+        ".js" => "text/javascript",
         _ => {
             todo!("Not supported mimo type");
         }

@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
@@ -32,7 +32,7 @@ impl WsServer {
             let mut socket = match tcp_listener.accept().await {
                 Ok((socket, remote_add)) => {
                     println!(
-                        "Handling new connection: {}:{}",
+                        "New connection: {}:{}",
                         remote_add.ip().to_string(),
                         remote_add.port()
                     );
@@ -48,17 +48,13 @@ impl WsServer {
             let clients_copy = Arc::clone(&clients);
             tokio::spawn(async move {
                 let mut http_session = HttpSession::new(router_copy);
-                if let Err(error) = http_session.handle_socket(&mut socket).await {
-                    if error == HttpHandleError::WebsocketProtocol {
-                        let ws_session = WsSession::new(socket, clients_copy).await;
-                        let mut ws_session = match ws_session {
-                            Some(ws_session) => ws_session,
-                            None => {
-                                eprintln!("Can't accept websockt connection");
-                                return;
-                            }
-                        };
+                if let Err(HttpHandleError::WebsocketProtocol) =
+                    http_session.handle_socket(&mut socket).await
+                {
+                    if let Some(mut ws_session) = WsSession::new(socket, clients_copy).await {
                         ws_session.handle_ws_connection().await;
+                    } else {
+                        eprintln!("Could not accept websocket connection");
                     }
                 }
             });

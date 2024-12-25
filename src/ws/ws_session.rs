@@ -1,3 +1,4 @@
+use crate::ws::ws_message::MessageType;
 use futures::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
@@ -7,15 +8,6 @@ use tokio::{
     sync::{mpsc::channel, Mutex},
 };
 use tokio_tungstenite::{accept_async, tungstenite::protocol::Message, WebSocketStream};
-
-enum CommandType {
-    EnterNickname(String),
-    PrivateMessage(String, String),
-    Leave,
-    MessageToAll(String),
-    ShowHelp,
-    Unknown(String),
-}
 
 const USAGE_MSG: &str = "To use chat, you need to set your nickname.
 Usage:
@@ -32,7 +24,7 @@ pub struct WsSession<S> {
     socket_read_half: SocketReadHalf<S>,
     socket_write_half: SocketWriteHalf<S>,
     clients: Clients<S>,
-    nickname: Option<String>,
+    nickname: Arc<Mutex<Option<String>>>,
 }
 
 impl<S> WsSession<S>
@@ -47,6 +39,7 @@ where
                 return ();
             })
             .unwrap();
+
         let (write_half, read_half) = ws_socket.split();
         let write_half = Arc::new(Mutex::new(write_half));
         write_half
@@ -60,85 +53,110 @@ where
             socket_read_half: read_half,
             socket_write_half: write_half,
             clients,
-            nickname: None,
+            nickname: Arc::new(Mutex::new(None)),
         })
     }
 
     pub async fn handle_ws_connection(&mut self) {
         let (tx, mut rx) = channel::<String>(5);
-
-        let clients_clone = self.clients.clone();
-        let client_nickname = self.nickname.clone();
-        tokio::spawn(async move {
-            loop {
-                match rx.recv().await {
-                    Some(message) => {
-                        if let Some(nick) = &client_nickname {
-                            Self::brodcast_message(nick, message.clone(), clients_clone.clone())
-                                .await;
-                        };
-                    }
-                    None => {}
-                }
-            }
-        });
-
         loop {
-            let msg = match self.socket_read_half.next().await {
-                Some(Ok(Message::Text(msg))) => msg,
-                Some(Ok(Message::Binary(data))) => String::from_utf8(data).unwrap(),
-                Some(Ok(Message::Close(_))) => {
-                    self.handle_close_message().await;
-                    return;
-                }
-                _ => {
-                    // Do nothing for Ping/Pong message
-                    continue;
-                }
-            };
+            let clients_clone = Arc::clone(&self.clients);
+            let client_nickname = Arc::clone(&self.nickname);
 
-            // Parse message
-            match self.parse_command(msg) {
-                CommandType::EnterNickname(nick) => {
-                    if self.nickname.is_none() {
-                        self.nickname = Some(nick.clone());
-                        self.send_to_self(format!("Hello {}, now you can send messages", nick));
-                        continue;
-                    }
-                }
-                CommandType::MessageToAll(message) => match self.nickname {
-                    None => {
-                        self.send_to_self(String::from(
-                            "Please enter your nickname: /nick <your_nickname>",
-                        ));
-                    }
-                    Some(_) => match tx.send(message).await {
-                        Ok(_) => {}
-                        Err(e) => {
-                            eprintln!("Could not brodcast message, error: {}", e);
-                        }
-                    },
-                },
-                CommandType::PrivateMessage(_client, _message) => {
-                    todo!("Implement send private message, to specified client");
-                }
-                CommandType::Leave => {
-                    match &self.nickname {
-                        Some(nick) => {
-                            self.send_to_self(format!("You left the chat."));
-                            self.clients.lock().await.remove(nick);
-                            self.nickname = None;
-                        }
-                        None => {
-                            self.send_to_self(format!("Leave impossible, you are not in the chat"));
+            tokio::select! {
+                message = rx.recv() => {
+                    if let Some(message) = message {
+                        if let Some(ref nick) = *client_nickname.lock().await {
+                            Self::brodcast_message(
+                                nick,
+                                message.clone(),
+                                Arc::clone(&clients_clone),
+                            )
+                            .await;
                         }
                     }
                 }
-                CommandType::ShowHelp => {
-                    self.send_to_self(USAGE_MSG.to_string());
-                }
-                CommandType::Unknown(command) => {
-                    self.send_to_self(format!("Command: {} not supported.", command));
+                message = self.socket_read_half.next() => {
+                    let msg = match message {
+                        Some(Ok(Message::Text(msg))) => msg,
+                        Some(Ok(Message::Binary(data))) => String::from_utf8(data).unwrap(),
+                        Some(Ok(Message::Close(_))) => {
+                            self.handle_close_message().await;
+                            return;
+                        }
+                        _ => {
+                            // Do nothing for Ping/Pong message
+                            continue;
+                        }
+                    };
+
+                    if let Some(m) = self.parse_command(msg) {
+                        match m {
+                            MessageType::Nick(nick_message) => {
+                                if self.nickname.lock().await.is_none() {
+                                    *self.nickname.lock().await = Some(nick_message.nick.clone());
+                                    self.clients.lock().await.insert(
+                                        nick_message.nick.clone(),
+                                        Arc::clone(&self.socket_write_half),
+                                    );
+                                    self.send_to_self(format!(
+                                        "Hello {}, now you can send messages",
+                                        nick_message.nick
+                                    ));
+                                    continue;
+                                }
+                            }
+                            MessageType::Chat(chat_message) => match *self.nickname.lock().await {
+                                None => {
+                                    self.send_to_self(String::from(
+                                        "Please enter your nickname: /nick <your_nickname>",
+                                    ));
+                                }
+                                Some(_) => match tx.send(chat_message.message).await {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        eprintln!("Could not brodcast message, error: {}", e);
+                                    }
+                                },
+                            },
+                            MessageType::Private(private_message) => {
+                                let clients = self.clients.lock().await;
+                                if let Some(c) = clients.get(&private_message.receiver) {
+                                    c.lock()
+                                        .await
+                                        .send(Message::Text(private_message.message))
+                                        .await
+                                        .expect("Private message to be sent.");
+                                } else {
+                                    self.send_to_self(format!(
+                                        "Client with nickname: {} is not connected to chat",
+                                        private_message.receiver
+                                    ));
+                                }
+                            }
+                            MessageType::Quit(_) => {
+                                let mut nick = self.nickname.lock().await;
+
+                                match *nick {
+                                    Some(ref n) => {
+                                        self.send_to_self(format!("You left the chat."));
+                                        self.clients.lock().await.remove(n);
+                                        *nick = None;
+                                    }
+                                    None => {
+                                        self.send_to_self(format!(
+                                            "Leave impossible, you are not in the chat"
+                                        ));
+                                    }
+                                }
+                            }
+                            MessageType::Help(_) => {
+                                self.send_to_self(USAGE_MSG.to_string());
+                            }
+                        }
+                    } else {
+                        self.send_to_self(format!("Command not supported."));
+                    }
                 }
             }
         }
@@ -164,8 +182,8 @@ where
     }
 
     async fn handle_close_message(&self) {
-        match &self.nickname {
-            Some(nick) => {
+        match *self.nickname.lock().await {
+            Some(ref nick) => {
                 self.clients.lock().await.remove(nick);
             }
             None => {}
@@ -185,35 +203,11 @@ where
         });
     }
 
-    fn parse_command(&self, input: String) -> CommandType {
-        match input.strip_prefix('/') {
-            None => CommandType::MessageToAll(input),
-            // handle command
-            Some(after_prefix) => {
-                match after_prefix {
-                    "help" => return CommandType::ShowHelp,
-                    "quit" => return CommandType::Leave,
-                    _ => {}
-                }
-
-                if let Some((command, rest)) = after_prefix.split_once(' ') {
-                    match command {
-                        "nick" => return CommandType::EnterNickname(rest.to_string()),
-                        "private" => {
-                            if let Some((nick, message)) = rest.split_once(' ') {
-                                if !nick.is_empty() {
-                                    return CommandType::PrivateMessage(
-                                        nick.to_string(),
-                                        message.to_string(),
-                                    );
-                                };
-                            }
-                        }
-                        _ => return CommandType::Unknown(command.to_string()),
-                    };
-                }
-                return CommandType::Unknown(after_prefix.to_string());
-            }
+    fn parse_command(&self, input: String) -> Option<MessageType> {
+        let message = serde_json::from_str::<MessageType>(&input);
+        match message {
+            Ok(message) => Some(message),
+            Err(_) => None,
         }
     }
 }

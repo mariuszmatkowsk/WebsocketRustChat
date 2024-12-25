@@ -47,6 +47,11 @@ async fn main() {
         )
         .add_route(
             Method::Get,
+            String::from("/script.js"),
+            StaticFileHandler::new(file_storage.clone(), String::from("script.js"))
+        )
+        .add_route(
+            Method::Get,
             String::from("/favicon.ico"),
             Middleware::new(
                 RequestLogger::new(),
