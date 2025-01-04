@@ -36,4 +36,3 @@ pub enum MessageType {
     #[serde(rename = "quit")]
     Quit(QuitMessage),
 }
-

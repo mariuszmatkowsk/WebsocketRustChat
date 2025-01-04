@@ -57,29 +57,19 @@ impl HttpSession {
 
         let mut buffer = [0; 1024];
         let mut total = 0;
-        loop {
-            let n = match socket.peek(&mut buffer).await {
-                Ok(n) => {
-                    if n == 0 {
-                        eprintln!("Can't read any data from client: {}", remote_addr);
-                        return Err(HttpHandleError::SocketConnectionError);
-                    }
-                    n
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Error during read from client: {}, error: {}",
-                        remote_addr, e
-                    );
-                    return Err(HttpHandleError::SocketConnectionError);
-                }
-            };
 
-            let input = String::from_utf8(buffer[..n].to_vec())
-                .map_err(|e| {
-                    eprintln!("Can't convert utf8 to valid char, error: {}", e);
-                })
-                .unwrap();
+        while let Ok(n) = socket.peek(&mut buffer).await {
+            if n == 0 {
+                eprintln!("Can't read any data from client: {}", remote_addr);
+                return Err(HttpHandleError::SocketConnectionError);
+            }
+
+            let input = if let Ok(input) = String::from_utf8(buffer[..n].to_vec()) {
+                input
+            } else {
+                eprintln!("Can't convert request to valid utf8 charactre");
+                return Err(HttpHandleError::ParseRequestError);
+            };
 
             total += n;
 

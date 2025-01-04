@@ -40,7 +40,10 @@ impl Handler for RequestLogger {
         println!("**************************** Request **********************************");
         println!("Method: {}", request.method);
         println!("Uri: {}", request.uri);
-        println!("Version: HTTP/{}.{}", request.version_major, request.version_minor);
+        println!(
+            "Version: HTTP/{}.{}",
+            request.version_major, request.version_minor
+        );
         println!("Headers:");
         for h in request.headers.iter() {
             println!("\t{}: {}", h.name, h.value);
@@ -48,4 +51,3 @@ impl Handler for RequestLogger {
         println!("***********************************************************************");
     }
 }
-

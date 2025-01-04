@@ -17,7 +17,7 @@ impl FromStr for Method {
             "POST" => Ok(Self::Post),
             "UPDATE" => Ok(Self::Update),
             "DELETE" => Ok(Self::Delete),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }

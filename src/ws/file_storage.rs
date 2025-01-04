@@ -13,10 +13,7 @@ impl FileStorage {
         let entries = match read_dir(path) {
             Ok(entries) => entries,
             Err(err) => {
-                eprintln!(
-                    "Can't read provided dir path: {:?}, error: {}",
-                    path, err
-                );
+                eprintln!("Can't read provided dir path: {:?}, error: {}", path, err);
                 return None;
             }
         };

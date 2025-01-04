@@ -9,6 +9,17 @@ use crate::ws::http_request::HttpRequest;
 use crate::ws::http_response::{HttpResponse, StatusType};
 use crate::ws::method::Method;
 
+macro_rules! check_or_handle_error {
+    ($expr:expr, $error_page:expr, $status:expr, $request:expr, $response:expr, $self:expr) => {
+        if let Some(value) = $expr {
+            value
+        } else {
+            $self.handle_error($error_page.to_string(), $status, &$request, $response);
+            return;
+        }
+    };
+}
+
 pub struct HttpRouter {
     routes: HashMap<Method, HashMap<String, Box<dyn Handler + Sync + Send>>>,
     file_storage: Arc<FileStorage>,
@@ -23,44 +34,35 @@ impl HttpRouter {
     }
 
     pub fn handle(&self, request: &HttpRequest, response: &mut HttpResponse) {
-        let method = match Method::from_str(request.method.as_str()) {
-            Ok(method) => method,
-            Err(_) => {
-                self.handle_error(
-                    "405.html".to_string(),
-                    StatusType::MethodNotAllowed,
-                    &request,
-                    response,
-                );
-                return;
-            }
+        let method = if let Ok(method) = Method::from_str(request.method.as_str()) {
+            method
+        } else {
+            self.handle_error(
+                "405.html".to_string(),
+                StatusType::MethodNotAllowed,
+                &request,
+                response,
+            );
+            return;
         };
 
-        let inner_map = match self.routes.get(&method) {
-            Some(inner_map) => inner_map,
-            None => {
-                self.handle_error(
-                    "405.html".to_string(),
-                    StatusType::MethodNotAllowed,
-                    &request,
-                    response,
-                );
-                return;
-            }
-        };
+        let inner_map = check_or_handle_error!(
+            self.routes.get(&method),
+            "405.html",
+            StatusType::MethodNotAllowed,
+            &request,
+            response,
+            self
+        );
 
-        let handler = match inner_map.get(&request.uri) {
-            Some(handler) => handler,
-            None => {
-                self.handle_error(
-                    "404.html".to_string(),
-                    StatusType::NotFound,
-                    &request,
-                    response,
-                );
-                return;
-            }
-        };
+        let handler = check_or_handle_error!(
+            inner_map.get(&request.uri),
+            "404.html",
+            StatusType::NotFound,
+            &request,
+            response,
+            self
+        );
 
         handler.handle(request, response);
     }

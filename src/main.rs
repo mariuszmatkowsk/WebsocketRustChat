@@ -7,9 +7,9 @@ use std::sync::Arc;
 use ws::file_storage::FileStorage;
 use ws::http_router::HttpRouter;
 use ws::method::Method;
-use ws::ws_server::WsServer;
-use ws::static_file_handler::StaticFileHandler;
 use ws::middleware::{Middleware, RequestLogger};
+use ws::static_file_handler::StaticFileHandler;
+use ws::ws_server::WsServer;
 
 #[tokio::main]
 async fn main() {
@@ -19,12 +19,12 @@ async fn main() {
         std::process::exit(1);
     }
     let doc_root_path = Path::new(&args[1]);
-    let file_storage = match FileStorage::new(doc_root_path) {
-        Some(file_storage) => file_storage,
-        None => {
-            eprintln!("Could not load files from provided directory");
-            std::process::exit(1);
-        }
+
+    let file_storage = if let Some(file_storage) = FileStorage::new(doc_root_path) {
+        file_storage
+    } else {
+        eprintln!("Cuuld not load files from provided directory");
+        std::process::exit(1);
     };
 
     let file_storage = Arc::new(file_storage);
@@ -36,26 +36,29 @@ async fn main() {
             String::from("/"),
             Middleware::new(
                 RequestLogger::new(),
-                StaticFileHandler::new(file_storage.clone(), String::from("index.html"))),
+                StaticFileHandler::new(file_storage.clone(), String::from("index.html")),
+            ),
         )
         .add_route(
             Method::Get,
             String::from("/index.html"),
             Middleware::new(
                 RequestLogger::new(),
-                StaticFileHandler::new(file_storage.clone(), String::from("index.html"))),
+                StaticFileHandler::new(file_storage.clone(), String::from("index.html")),
+            ),
         )
         .add_route(
             Method::Get,
             String::from("/script.js"),
-            StaticFileHandler::new(file_storage.clone(), String::from("script.js"))
+            StaticFileHandler::new(file_storage.clone(), String::from("script.js")),
         )
         .add_route(
             Method::Get,
             String::from("/favicon.ico"),
             Middleware::new(
                 RequestLogger::new(),
-                StaticFileHandler::new(file_storage.clone(), String::from("favicon.png")))
+                StaticFileHandler::new(file_storage.clone(), String::from("favicon.png")),
+            ),
         );
 
     WsServer::new(http_router).start("localhost:6969").await;

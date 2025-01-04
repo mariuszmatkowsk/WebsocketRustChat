@@ -29,19 +29,16 @@ impl WsServer {
         let clients = Arc::new(Mutex::new(HashMap::new()));
 
         loop {
-            let mut socket = match tcp_listener.accept().await {
-                Ok((socket, remote_add)) => {
-                    println!(
-                        "New connection: {}:{}",
-                        remote_add.ip().to_string(),
-                        remote_add.port()
-                    );
-                    socket
-                }
-                Err(e) => {
-                    eprintln!("Could not accept new Tcp connection, error: {}", e);
-                    continue;
-                }
+            let mut socket = if let Ok((socket, remote_addr)) = tcp_listener.accept().await {
+                println!(
+                    "New connection {}:{}",
+                    remote_addr.ip().to_string(),
+                    remote_addr.port()
+                );
+                socket
+            } else {
+                eprintln!("Could not accept new Tcp connection");
+                continue;
             };
 
             let router_copy = Arc::clone(&self.router);

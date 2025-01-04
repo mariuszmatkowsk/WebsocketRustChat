@@ -13,18 +13,20 @@ pub struct StaticFileHandler {
 
 impl Handler for StaticFileHandler {
     fn handle(&self, _request: &HttpRequest, response: &mut HttpResponse) {
-        let file_content = match self.file_storage.get(&self.file_name) {
-            Some(file_content) => file_content,
-            None => {
-                todo!("Response Not found");
-            }
+        let file_content = if let Some(file_content) = self.file_storage.get(&self.file_name) {
+            file_content
+        } else {
+            todo!("Response Not found");
         };
 
         let mut headers = Vec::new();
         headers.push(HttpHeader::new(
             "Content-Type",
             extension_to_http_mimo_type(
-                &self.file_name[self.file_name.find('.').expect("File should have extension")..],
+                &self.file_name[self
+                    .file_name
+                    .find('.')
+                    .expect("File should have extension")..],
             ),
         ));
 
@@ -40,19 +42,6 @@ impl StaticFileHandler {
         }
     }
 }
-
-// pub fn static_file_handler(
-//     file_storage: Arc<FileStorage>,
-//     file_name: String,
-// ) -> impl Fn(&HttpRequest, &mut HttpResponse) + Send + Sync + 'static {
-//     move |req, resp| {
-//         StaticFileHandler {
-//             file_storage: file_storage.clone(),
-//             file_name: file_name.clone(),
-//         }
-//         .handle(req, resp);
-//     }
-// }
 
 fn extension_to_http_mimo_type(extension: &str) -> &str {
     match extension {
